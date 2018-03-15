@@ -7,6 +7,7 @@ import exifread
 from PIL.ExifTags import TAGS, GPSTAGS
 import os
 import csv
+import shutil
 
 # photos had to be exported from iphoto. File > export > Export Unmodified Original
 #source activate barcode-reader
@@ -73,28 +74,38 @@ def GetMetaData(image):
 
 
 
+def MakeGoodDataDirectory(feildID):
+    '''If QR code can be read, and GPS data is all good, make directory:
+    /processed/<FieldID>/'''
+    # add some sort of assert statement here to check the above condition.
+    path = '/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/processed'+'/'+str(feildID)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    return path
 
-#if not os.path.exists(directory):
-    #os.makedirs("/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/processed")
+
+def MakeBadDataDirectory(filename):
+
+
 
 for f in files:
     image = Image.open(f)
     GetMetaData(image)
+    feildID = GetQRCode(image)
+    path = MakeGoodDataDirectory(feildID)
+    shutil.copy2(f, path)
 
 
 
 
 
-with open('metadata/EucMetadata.csv', mode='r') as infile:
-    reader = csv.reader(infile)
-    with open('coors_new.csv', mode='w') as outfile:
-        writer = csv.writer(outfile)
-        mydict = {rows[0]:rows[1] for rows in reader}
-        print(mydict)
+
+
+
 
 
         # READING IN CSV:
-# reader = csv.reader(open("file.csv", "rb"))
+# reader = csv.reader(open('metadata/EucMetadata.csv', "rb"))
 #     for rows in reader:
 #         k = rows[0]
 #         v = rows[1]
