@@ -84,14 +84,34 @@ def MakeGoodDataDirectory(feildID):
     return path
 
 
-def MakeBadDataDirectory(filename):
+def MoveToUnknown(filename):
+    path = '/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/processed/unknown'
+    shutil.copy2(filename, path)
+
+
+def MoveToNoMeta(filename):
+    path = '/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/processed/no-metadata'
+    shutil.copy2(filename, path)
+
 
 
 
 for f in files:
     image = Image.open(f)
-    GetMetaData(image)
+    if not image:
+        MoveToUnknown(f)
+        continue
+
+    date, time = GetMetaData(image)
+    if not date or not time:
+        MoveToNoMeta(f)
+        continue
+
     feildID = GetQRCode(image)
+    if not feildID:
+        MoveToUnknown(f)
+        continue
+
     path = MakeGoodDataDirectory(feildID)
     shutil.copy2(f, path)
 
