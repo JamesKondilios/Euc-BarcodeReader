@@ -1,49 +1,107 @@
 import zlib
 import glob
 import zbarlight
+import PIL
 from PIL import Image
 import exifread
 from PIL.ExifTags import TAGS, GPSTAGS
+import os
+import csv
 
 # photos had to be exported from iphoto. File > export > Export Unmodified Original
 #source activate barcode-reader
 #/Users/jameskonda/Desktop/Genomics/EucBarcodeReader
 
-def path_leaf(path):
-    """ guaranteed filename from path; works on Win / OSX / *nix """
-    head, tail = ntpath.split(path)
-    return tail
-print("HI")
 
 files = glob.glob("/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/TestPhotos/*.JPG")
 
+
+def GetFiles(dirPath):
+    files = glob.glob("/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/TestPhotos/*.JPG")
+    return files
+
+
+def GetQRCode(image):
+    codes = zbarlight.scan_codes('qrcode', image)
+    if codes:
+        code = codes[0].decode('utf8')
+        return code
+    else:
+        code = "unknown"
+
+        # flag for `unknown` folder
+
+
+
+# {
+#     1: 'N', # latitude ref
+#     2: ((51, 1), (3154, 100), (0, 1)), # latitude, rational degrees, mins, secs
+#     3: 'W', # longitude ref
+#     4: ((0, 1), (755, 100), (0, 1)), # longitude rational degrees, mins, secs
+#     5: 0, # altitude ref: 0 = above sea level, 1 = below sea level
+#     6: (25241, 397), # altitude, expressed as a rational number
+#     7: ((12, 1), (16, 1), (3247, 100)), # UTC timestamp, rational H, M, S
+#     16: 'T', # image direction when captured, T = true, M = magnetic
+#     17: (145423, 418) # image direction in degrees, rational
+# }
+
+
+def GetLatLonAlt(image):
+    exifdata = img._getexif()
+    decoded = dict((TAGS.get(key, key), value) for key, value in exifdata.items())
+    if decoded.get('GPSInfo'):
+        lat = [float(x) / float(y) for x, y in decoded['GPSInfo'][2]] # pull out latitude
+        lat = lat[0] + lat[1] / 60
+        if decoded['GPSInfo'][1] == "S": # correction for location relative to equator
+            lat *= -1
+        lon = [float(x) / float(y) for x, y in decoded['GPSInfo'][4]] # pull out longditude
+        lon = lon[0] + lon[1] / 60
+        if decoded['GPSInfo'][3] == "W": # corection for location relative to g'wch
+            lon *= -1
+        alt = float(decoded['GPSInfo'][6][0]) / float(decoded['GPSInfo'][6][1])
+        return [lat,lon,alt]
+    else:
+        # flag for unknown gps data folder
+        return
+
+
+def GetMetaData(image):
+    exifdata = image._getexif()
+    decoded = dict((TAGS.get(key, key), value) for key, value in exifdata.items())
+    date, time = decoded['DateTimeOriginal'].split(" ")
+    return date, time
+
+
+
+
+#if not os.path.exists(directory):
+    #os.makedirs("/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/processed")
+
 for f in files:
-    im = Image.open(f)
-    codes = zbarlight.scan_codes('qrcode', im)
-    code = codes[0].decode('utf8') if codes else 'unknown'
-    print(f + ": " + 'QR codes: %s' % code)
-
-    img = Image.open(f)
-    info = img._getexif()
-
-    decoded = dict((TAGS.get(key, key), value) for key, value in info.items())
-    print(decoded.get('GPSInfo'))
-
-    lat = [float(x) / float(y) for x, y in decoded['GPSInfo'][2]]
-    lat = lat[0] + lat[1] / 60
-    lon = [float(x) / float(y) for x, y in decoded['GPSInfo'][4]]
-    lon = lon[0] + lon[1] / 60
-    alt = float(decoded['GPSInfo'][6][0]) / float(decoded['GPSInfo'][6][1])
-
-    if decoded['GPSInfo'][1] == "S":
-        lat *= -1
-    if decoded['GPSInfo'][3] == "W":
-        lon *= -1
-
-    print(lat,lon,alt)
+    image = Image.open(f)
+    GetMetaData(image)
 
 
 
+
+
+with open('metadata/EucMetadata.csv', mode='r') as infile:
+    reader = csv.reader(infile)
+    with open('coors_new.csv', mode='w') as outfile:
+        writer = csv.writer(outfile)
+        mydict = {rows[0]:rows[1] for rows in reader}
+        print(mydict)
+
+
+        # READING IN CSV:
+# reader = csv.reader(open("file.csv", "rb"))
+#     for rows in reader:
+#         k = rows[0]
+#         v = rows[1]
+#         mydict[k] = v
+
+
+# put
 # photos had to be exported from iphoto. File > export > Export Unmodified Original
 #source activate barcode-reader
 #/Users/jameskonda/Desktop/Genomics/EucBarcodeReader
