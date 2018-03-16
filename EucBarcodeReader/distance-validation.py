@@ -133,13 +133,13 @@ for f in files:
         MoveToUnknown(f)
         continue
 
-    metadata = CheckIfMetadata(feildID, filename)
+    metadata = CheckIfMetadata(feildID, f)
     if not metadata:
         MoveToNoMeta(f)
         continue
 
     else: # gotten past the filter
-        MoveToAllGood(feildID, filename)
+        MoveToAllGood(feildID, f)
 
 
 
