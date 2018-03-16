@@ -66,32 +66,71 @@ def GetLatLonAlt(image):
         return
 
 
-def GetMetaData(image):
+def GetExifData(image):
     exifdata = image._getexif()
     decoded = dict((TAGS.get(key, key), value) for key, value in exifdata.items())
     date, time = decoded['DateTimeOriginal'].split(" ")
     return date, time
 
 
+def CheckIfMetadata(feildID, filename):
+    # lookup metadata in CSV
+    # CHECK if metadata:
+        # if not, Move to Move to no-metadata
+    with open("/metadata/EucMetadata.csv", "rb") as f:
+        csvreader = csv.reader(f, delimiter=",")
+        for row in csvreader:
+            if feildID not in row[7]: # Accession col
+                print("Accession not found: " + str(feildID))
+                path = '/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/processed/no-metadata/' + str(feildID)
+                if not os.path.exists(path):
+                    os.makedirs(path)
+                shutil.copy2(filename, path)
+                return None
+            else:
+                print("Accession found: " + str(feildID))
+                return "Flag"
 
-def MakeGoodDataDirectory(feildID):
+
+
+def MoveToAllGood(feildID, filename):
     '''If QR code can be read, and GPS data is all good, make directory:
-    /processed/<FieldID>/'''
+    /processed/<FieldID>/ and copy image to this location'''
     # add some sort of assert statement here to check the above condition.
-    path = '/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/processed'+'/'+str(feildID)
+    path = '/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/processed/all-good/' + str(feildID)
     if not os.path.exists(path):
         os.makedirs(path)
-    return path
+    shutil.copy2(filename, path)
+
 
 
 def MoveToUnknown(filename):
+    # add some sort of assert statement here to check the above condition.
     path = '/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/processed/unknown'
     shutil.copy2(filename, path)
 
 
-def MoveToNoMeta(filename):
-    path = '/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/processed/no-metadata'
-    shutil.copy2(filename, path)
+# def MoveToNoExif(feildID, filename):
+#     ''' If QR code can be read but metadata is missing, make directory
+#     /processed/no-metadata/<FeildID>/ and copy image to this location'''
+#     # add some sort of assert statement here to check the above condition.
+#     path = '/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/processed/no-metadata/' + str(feildID)
+#     if not os.path.exists(path):
+#         os.makedirs(path)
+#     shutil.copy2(filename, path)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -102,15 +141,17 @@ for f in files:
         MoveToUnknown(f)
         continue
 
-    date, time = GetMetaData(image)
-    if not date or not time:
-        MoveToNoMeta(f)
-        continue
-
     feildID = GetQRCode(image)
     if not feildID:
         MoveToUnknown(f)
         continue
+
+    metadata = CheckIfMetadata(feildID, filename)
+    if not date or not time:
+        MoveToNoMeta(f)
+        continue
+
+
 
     path = MakeGoodDataDirectory(feildID)
     shutil.copy2(f, path)
