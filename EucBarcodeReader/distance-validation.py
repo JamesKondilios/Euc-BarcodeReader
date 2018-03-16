@@ -122,19 +122,6 @@ def MoveToUnknown(filename):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 for f in files:
     image = Image.open(f)
     if not image:
@@ -147,14 +134,12 @@ for f in files:
         continue
 
     metadata = CheckIfMetadata(feildID, filename)
-    if not date or not time:
+    if not metadata:
         MoveToNoMeta(f)
         continue
 
-
-
-    path = MakeGoodDataDirectory(feildID)
-    shutil.copy2(f, path)
+    else: # gotten past the filter
+        MoveToAllGood(feildID, filename)
 
 
 
