@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import zlib
 import glob
 import zbarlight
@@ -8,31 +9,35 @@ from PIL.ExifTags import TAGS, GPSTAGS
 import os
 import csv
 import shutil
+from sys import stdin, stdout, stderr
+from tqdm import tqdm
+from docopt import docopt
 
 # photos had to be exported from iphoto. File > export > Export Unmodified Original
 #source activate barcode-reader
 #/Users/jameskonda/Desktop/Genomics/EucBarcodeReader
 
+def get_args():
+    CLI= """
+    USAGE:
+        imgproc.py [options] -o OUTDIR INPUT_IMAGE ...
 
-files = glob.glob("/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/TestPhotos/*.JPG")
-
-
-def GetFiles(dirPath):
-    files = glob.glob("/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/TestPhotos/*.JPG")
-    return files
+    OPTIONS:
+        -o OUTDIR   Output directory (creates subdirectories under here)
+        -a          Ask if we can't automatically get some data (NOT IMPLEMENTED)
+    """
+    opts = docopt(CLI)
+    return {"inputs": opts["INPUT_IMAGE"],
+            "output_dir": opts["-o"],
+            "ask": opts["-a"]}
 
 
 def GetQRCode(image):
     codes = zbarlight.scan_codes('qrcode', image)
     if codes:
-        code = codes[0].decode('utf8')
-        return code
+        return codes[0].decode('utf8')
     else:
-        code = "unknown"
-
-        # flag for `unknown` folder
-
-
+        return "unknown"
 
 # {
 #     1: 'N', # latitude ref
@@ -48,7 +53,7 @@ def GetQRCode(image):
 
 
 def GetLatLonAlt(image):
-    exifdata = img._getexif()
+    exifdata = image._getexif()
     decoded = dict((TAGS.get(key, key), value) for key, value in exifdata.items())
     if decoded.get('GPSInfo'):
         lat = [float(x) / float(y) for x, y in decoded['GPSInfo'][2]] # pull out latitude
@@ -60,102 +65,91 @@ def GetLatLonAlt(image):
         if decoded['GPSInfo'][3] == "W": # corection for location relative to g'wch
             lon *= -1
         alt = float(decoded['GPSInfo'][6][0]) / float(decoded['GPSInfo'][6][1])
-        return [lat,lon,alt]
-    else:
-        # flag for unknown gps data folder
-        return
-
+        return lat,lon,alt
+    return "", "", ""
 
 def GetExifData(image):
     exifdata = image._getexif()
     decoded = dict((TAGS.get(key, key), value) for key, value in exifdata.items())
-    date, time = decoded['DateTimeOriginal'].split(" ")
-    return date, time
+    datetime = decoded['DateTimeOriginal']
+    gps = GetLatLonAlt(image)
+    return datetime, gps
 
 
-def CheckIfMetadata(feildID, filename):
-    # lookup metadata in CSV
-    # CHECK if metadata:
-        # if not, Move to Move to no-metadata
-    with open("/metadata/EucMetadata.csv", "rb") as f:
-        csvreader = csv.reader(f, delimiter=",")
-        for row in csvreader:
-            if feildID not in row[7]: # Accession col
-                print("Accession not found: " + str(feildID))
-                path = '/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/processed/no-metadata/' + str(feildID)
-                if not os.path.exists(path):
-                    os.makedirs(path)
-                shutil.copy2(filename, path)
-                return None
-            else:
-                print("Accession found: " + str(feildID))
-                return "Flag"
+def OpenMetaData(filename):
+    metadata={}
+    with open(filename, mode='r') as infile:
+        reader = csv.reader(infile)
+        header = next(reader)
+        for row in reader:
+            id = row[7]
+            metadata[id] = list(row)
+    return header, metadata
+
+def MoveTo(source, destdir):
+    from os.path import exists, basename, join, splitext
+    destfile = join(destdir, basename(source))
+    if not exists(destdir):
+        os.makedirs(destdir)
+    while exists(destfile):
+        print("WARNING:", destfile, "exists, appending _2 to name", file=stderr)
+        file, ext = splitext(destfile)
+        destfile = file + "_2" + ext
+    shutil.copy2(source, destfile)
 
 
-
-def MoveToAllGood(feildID, filename):
-    '''If QR code can be read, and GPS data is all good, make directory:
-    /processed/<FieldID>/ and copy image to this location'''
-    # add some sort of assert statement here to check the above condition.
-    path = '/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/processed/all-good/' + str(feildID)
-    if not os.path.exists(path):
-        os.makedirs(path)
-    shutil.copy2(filename, path)
-
-
-
-def MoveToUnknown(filename):
-    # add some sort of assert statement here to check the above condition.
-    path = '/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/processed/unknown'
-    shutil.copy2(filename, path)
-
-
-# def MoveToNoExif(feildID, filename):
+# def MoveToNoExif(fieldID, filename):
 #     ''' If QR code can be read but metadata is missing, make directory
-#     /processed/no-metadata/<FeildID>/ and copy image to this location'''
+#     /processed/no-metadata/<fieldID>/ and copy image to this location'''
 #     # add some sort of assert statement here to check the above condition.
-#     path = '/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/processed/no-metadata/' + str(feildID)
+#     path = '/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/processed/no-metadata/' + str(fieldID)
 #     if not os.path.exists(path):
 #         os.makedirs(path)
 #     shutil.copy2(filename, path)
 
 
+header, metadata = OpenMetaData('/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/metadata/EucMetadata.csv')
+options = get_args()
+out = options["output_dir"]
+if not os.path.isdir(out):
+    os.makedirs(out)
+csv_out = out + "/annotated_metadata.csv"
+if not os.path.exists(csv_out):
+    with open(csv_out, "w") as fh:
+        print(*header, "EXIF_datetime", "EXIF_GPS_lat", "EXIF_GPS_long", "EXIF_GPS_elev", file=fh, sep="\t")
 
-
-for f in files:
-    image = Image.open(f)
-    if not image:
-        MoveToUnknown(f)
+for f in tqdm(options["inputs"]):
+    try:
+        image = Image.open(f)
+    except Exception as exc:
+        print("ERROR:", str(exc), file=stderr)
+        MoveTo(f, out + "/unknown")
         continue
 
-    feildID = GetQRCode(image)
-    if not feildID:
-        MoveToUnknown(f)
+    fieldID = GetQRCode(image)
+    if not fieldID:
+        MoveTo(f, out + "/unknown")
         continue
 
-    metadata = CheckIfMetadata(feildID, f)
-    if not metadata:
-        MoveToNoMeta(f)
-        continue
+    Sample_metadata = metadata.get(fieldID)
+    if Sample_metadata:
+        MoveTo(f, out + "/all-good/" + fieldID)
+    else:
+        MoveTo(f, out + "/no-metadata/" + fieldID)
+        Sample_metadata = ["" for _ in header]
 
-    else: # gotten past the filter
-        MoveToAllGood(feildID, f)
-
-
-
-
-
+    datetime, gps = GetExifData(image)
+    with open(csv_out, "a")  as fh:
+        print(*Sample_metadata, datetime, *gps, file=fh, sep="\t")
 
 
-
-
-
+ p./distance-validation.py -o kdm Test1Photos/*
         # READING IN CSV:
 # reader = csv.reader(open('metadata/EucMetadata.csv', "rb"))
 #     for rows in reader:
 #         k = rows[0]
 #         v = rows[1]
-#         mydict[k] = v
+#         metadata[k] = v
 
 
 # put
