@@ -39,6 +39,7 @@ def GetQRCode(image):
     else:
         return "unknown"
 
+# GPS EXIF Vomit.
 # {
 #     1: 'N', # latitude ref
 #     2: ((51, 1), (3154, 100), (0, 1)), # latitude, rational degrees, mins, secs
@@ -50,7 +51,6 @@ def GetQRCode(image):
 #     16: 'T', # image direction when captured, T = true, M = magnetic
 #     17: (145423, 418) # image direction in degrees, rational
 # }
-
 
 def GetLatLonAlt(image):
     exifdata = image._getexif()
@@ -98,15 +98,6 @@ def MoveTo(source, destdir):
     shutil.copy2(source, destfile)
 
 
-# def MoveToNoExif(fieldID, filename):
-#     ''' If QR code can be read but metadata is missing, make directory
-#     /processed/no-metadata/<fieldID>/ and copy image to this location'''
-#     # add some sort of assert statement here to check the above condition.
-#     path = '/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/processed/no-metadata/' + str(fieldID)
-#     if not os.path.exists(path):
-#         os.makedirs(path)
-#     shutil.copy2(filename, path)
-
 
 header, metadata = OpenMetaData('/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/metadata/EucMetadata.csv')
 options = get_args()
@@ -144,17 +135,3 @@ for f in tqdm(options["inputs"]):
 
 
  p./distance-validation.py -o kdm Test1Photos/*
-        # READING IN CSV:
-# reader = csv.reader(open('metadata/EucMetadata.csv', "rb"))
-#     for rows in reader:
-#         k = rows[0]
-#         v = rows[1]
-#         metadata[k] = v
-
-
-# put
-# photos had to be exported from iphoto. File > export > Export Unmodified Original
-#source activate barcode-reader
-#/Users/jameskonda/Desktop/Genomics/EucBarcodeReader
-
-# Iphone GPS data is a little bit off :/
