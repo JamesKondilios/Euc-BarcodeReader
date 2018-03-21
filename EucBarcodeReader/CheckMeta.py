@@ -19,7 +19,7 @@ def CheckIfMetadata():#feildID, filename):
         mydict = dict((rows[7],[rows[0],rows[1],rows[2],rows[3],rows[4],rows[5],rows[6]]) for rows in reader)
 
     if "nah" not in mydict.keys():
-        print("good work dickhead")
+        print("good111 idiot")
 
 
 
