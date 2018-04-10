@@ -11,11 +11,18 @@ import csv
 import shutil
 from sys import stdin, stdout, stderr
 from tqdm import tqdm
+from functools import partial
 from docopt import docopt
+import multiprocessing as mp
 
 # photos had to be exported from iphoto. File > export > Export Unmodified Original
 #source activate barcode-reader
 #/Users/jameskonda/Desktop/Genomics/EucBarcodeReader
+
+## add verbose mode to say what errors it encounters
+
+# report data on how many failed
+#2nd stage for changing contrast # downscale resolution
 
 def get_args():
     CLI= """
@@ -23,14 +30,15 @@ def get_args():
         imgproc.py [options] -o OUTDIR INPUT_IMAGE ...
 
     OPTIONS:
-        -o OUTDIR   Output directory (creates subdirectories under here)
-        -a          Ask if we can't automatically get some data (NOT IMPLEMENTED)
+        -m METADATA     Metadata Database
+        -o OUTDIR       Output directory (creates subdirectories under here)
+        -a              Ask if we can't automatically get some data (NOT IMPLEMENTED)
     """
     opts = docopt(CLI)
     return {"inputs": opts["INPUT_IMAGE"],
+            "metadata": opts["-m"],
             "output_dir": opts["-o"],
             "ask": opts["-a"]}
-
 
 def GetQRCode(image):
     codes = zbarlight.scan_codes('qrcode', image)
@@ -75,7 +83,6 @@ def GetExifData(image):
     gps = GetLatLonAlt(image)
     return datetime, gps
 
-
 def OpenMetaData(filename):
     metadata={}
     with open(filename, mode='r') as infile:
@@ -86,7 +93,7 @@ def OpenMetaData(filename):
             metadata[id] = list(row)
     return header, metadata
 
-def MoveTo(source, destdir):
+def copy_to(source, destdir):
     from os.path import exists, basename, join, splitext
     destfile = join(destdir, basename(source))
     if not exists(destdir):
@@ -98,40 +105,43 @@ def MoveTo(source, destdir):
     shutil.copy2(source, destfile)
 
 
+def process_image(f, options={}):
+    header, metadata = OpenMetaData(options["metadata"])
+    out = options["output_dir"]
+    if not os.path.isdir(out):
+        os.makedirs(out)
+    csv_out = out + "/annotated_metadata.csv"
+    if not os.path.exists(csv_out):
+        with open(csv_out, "w") as fh:
+            print(*header, "EXIF_datetime", "EXIF_GPS_lat", "EXIF_GPS_long", "EXIF_GPS_elev", file=fh, sep="\t")
 
-header, metadata = OpenMetaData('/Users/jameskonda/Desktop/Genomics/EucBarcodeReader/metadata/EucMetadata.csv')
-options = get_args()
-out = options["output_dir"]
-if not os.path.isdir(out):
-    os.makedirs(out)
-csv_out = out + "/annotated_metadata.csv"
-if not os.path.exists(csv_out):
-    with open(csv_out, "w") as fh:
-        print(*header, "EXIF_datetime", "EXIF_GPS_lat", "EXIF_GPS_long", "EXIF_GPS_elev", file=fh, sep="\t")
-
-for f in tqdm(options["inputs"]):
+    out = options["output_dir"]
     try:
         image = Image.open(f)
     except Exception as exc:
         print("ERROR:", str(exc), file=stderr)
-        MoveTo(f, out + "/unknown")
-        continue
+        copy_to(f, out + "/unknown")
 
     fieldID = GetQRCode(image)
     if not fieldID:
-        MoveTo(f, out + "/unknown")
-        continue
+        copy_to(f, out + "/unknown")
+    else:
+        copy_to(f, out + "/" + fieldID)
 
     Sample_metadata = metadata.get(fieldID)
-    if Sample_metadata:
-        MoveTo(f, out + "/all-good/" + fieldID)
-    else:
-        MoveTo(f, out + "/no-metadata/" + fieldID)
+    if not Sample_metadata:
         Sample_metadata = ["" for _ in header]
 
     datetime, gps = GetExifData(image)
     with open(csv_out, "a")  as fh:
         print(*Sample_metadata, datetime, *gps, file=fh, sep="\t")
 
+def main(options):
 
- p./distance-validation.py -o kdm Test1Photos/*
+    proc_img_with_opts = partial(process_image, options=options)
+    pool = mp.Pool()
+    for f in tqdm(pool.imap(proc_img_with_opts, options["inputs"])):
+        pass
+
+if __name__ == "__main__":
+    main(get_args())
