@@ -1,0 +1,110 @@
+---
+title: "Emarg_Analysis"
+author: "James Kondilios"
+date: "20/04/2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r Libraries}
+library(adegenet)
+library(ggfortify)
+```
+
+Import Sample Accessions and Metadata:
+```{r}
+
+accessionfile <- 'https://raw.githubusercontent.com/LaMariposa/eucalyptus_data/master/Emarginata_Accessions.csv'
+samplefile <- 'https://raw.githubusercontent.com/LaMariposa/eucalyptus_data/master/Emarginata_PlantsSamples.csv'
+
+cov2color="transect"
+```
+
+
+Environmental and Climate data
+```{r}
+
+waiting on data
+
+```
+
+Future climate data
+
+```{r}
+waiting on data
+
+```
+
+
+
+
+Import SNP Genotype Matrix:
+```{r}
+# read in SNP genotype csv matrix
+SNPgeno <- read.csv("/Users/jameskonda/Desktop/Genomics/Landscape_Genomics/Emarg/unthin/genos_matrix.csv")
+
+# Assign rownames the sample ID's and remove the sample ID's column
+rownames(SNPgeno) <- SNPgeno[,1]
+SNPgeno=SNPgeno[,-1]
+dim(SNPgeno)
+SNPgeno[1:3,1:5]
+```
+
+
+
+
+Format Genotype data for genind object. 
+```{r}
+# This took ages: saved output to `genos.gi.rda`
+#format for input into genid object
+#genos.filt=SNPgeno
+#fix loci names so happy
+#colnames(genos.filt)=gsub(".","_",colnames(genos.filt),fixed=T)
+#genos.filt[genos.filt == "./."] <- NA
+#convert to genid object
+#genos.gi <- df2genind(genos.filt,sep="/",NA.char=NA)
+#genos.gi
+#save(genos.gi, file="genos.gi.rda")
+
+```
+
+```{r}
+load('genos.gi.rda')
+```
+
+
+Add sample metadata, courtesy of megan
+```{r}
+#add sample metadata
+sampleinfo=read.csv(samplefile, header=TRUE)  #read in sample information with populations 
+samplematches=match(sampleinfo$SampleID, indNames(genos.gi))  #subset for just samples in this analysis
+
+```
+
+```{r}
+#pca of genetic distance by individual
+genos.dist=dist(genos.gi)
+pcoa.genos=dudi.pco(genos.dist,scannf = F, nf = 3)
+```
+
+PCA of first two components: PCA using dudi.pco 
+```{r}
+percent_var=round(100*pcoa.genos$eig/sum(pcoa.genos$eig),1)
+
+plot(pcoa.genos$li[,1:2],xlab = paste("PCOA axis 1 (", percent_var[1],"%)"), ylab = paste("PCOA axis 2 (", percent_var[2],"%)")) 
+prcomp(data.frame())
+
+EMar_acccessions <- read.csv('https://raw.githubusercontent.com/LaMariposa/eucalyptus_data/master/Emarginata_Accessions.csv')
+pcdf <- data.frame(pcoa.genos$li)
+pcdf$sample = rownames(pcoa.genos$li)
+pcdf = left_join(pcdf, EMar_acccessions, by=c())
+
+ggplot(pcdf, aes(x= A1, y=A2)) + 
+  geom_point() + 
+  theme_gray() +
+  xlab(paste("PCOA axis 1 (", percent_var[1],"%)")) +
+  ylab(paste("PCOA axis 2 (", percent_var[2],"%)")) + 
+  ggtitle("Principle Coordinate Analysis of SNP Genotypes")
+
+```
