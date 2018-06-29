@@ -1,1 +1,1 @@
-# Euc-BarcodeReader
+# Bioinformatics-Scripts
